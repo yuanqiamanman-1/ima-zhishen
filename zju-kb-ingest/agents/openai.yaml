@@ -1,0 +1,4 @@
+interface:
+  display_name: "浙大知识库入库助手"
+  short_description: "按 INDEX 完成浙大资料导入、多来源经验笔记与日志追溯"
+  default_prompt: "Use $zju-kb-ingest to organize these ZJU sources into 浙大校园信息站。"

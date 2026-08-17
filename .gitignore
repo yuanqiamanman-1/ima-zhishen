@@ -1,0 +1,11 @@
+# Local credentials and runtime state
+.env
+.env.*
+*.key
+*.token
+*.log
+node_modules/
+zju-kb-pending-native-notes.json
+
+# Local release artifacts
+*.zip
