@@ -52,7 +52,18 @@ async function main() {
   const uploadName = args['upload-name'] || path.basename(sourcePath); const ext = path.extname(uploadName).slice(1).toLowerCase(); const type = TYPES[ext]; if (!type) fail('unsupported-file-type');
   const stat = fs.statSync(sourcePath); if (stat.size > (LIMIT[type[0]] || 200 * 1024 * 1024)) fail('file-exceeds-size-limit');
   const credentials = { clientId: secret('client_id'), apiKey: secret('api_key') }; if (!credentials.clientId || !credentials.apiKey) fail('ima-credentials-not-configured');
-  const person = profile(); const libraries = await post('wiki', 'get_addable_knowledge_base_list', { cursor: '', limit: 50 }, credentials); const library = (libraries.addable_knowledge_base_list || []).find((item) => item && item.name === KB_NAME); if (!library) fail('target-library-not-addable');
+  const person = profile();
+  // 库定位：优先 search_knowledge_base（info_list，共享/管理员角色可见）；addable 列表兜底。
+  let library = null;
+  const named = await post('wiki', 'search_knowledge_base', { query: KB_NAME, cursor: '', limit: 20 }, credentials);
+  const namedList = (named && named.info_list) || [];
+  library = namedList.find((item) => item && item.kb_name === KB_NAME);
+  if (!library) {
+    const libraries = await post('wiki', 'get_addable_knowledge_base_list', { cursor: '', limit: 50 }, credentials);
+    library = (libraries.addable_knowledge_base_list || []).find((item) => item && item.name === KB_NAME);
+  }
+  if (!library) fail('target-library-not-addable');
+  library.id = library.id || library.kb_id;
   const root = await listAll(library.id, null, credentials); const folder = root.find((item) => item && item.media_type === 99 && item.title === args.folder); if (!folder) fail('target-folder-missing');
   const repeated = await post('wiki', 'check_repeated_names', { knowledge_base_id: library.id, folder_id: folder.media_id, params: [{ name: uploadName, media_type: type[0] }] }, credentials); const duplicate = (repeated.results || []).some((item) => item && item.is_repeated);
   const report = { mode: args.dryRun ? 'dry-run' : 'execute', type: 'file', file: uploadName, folder: args.folder, status: args.status, duplicate, imported: false, logEntries: 0, aiRetrieval: '未验证' };

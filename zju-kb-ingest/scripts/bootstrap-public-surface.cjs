@@ -86,9 +86,17 @@ async function main() {
   const clientId = secret('client_id');
   const apiKey = secret('api_key');
   stage = 'locate-addable-library';
-  const libraries = await post('wiki', 'get_addable_knowledge_base_list', { cursor: '', limit: 50 }, clientId, apiKey);
-  const library = (libraries.addable_knowledge_base_list || []).find((item) => item.name === targetLibrary);
+  // 库定位：优先 search_knowledge_base（info_list，共享/管理员角色可见）；addable 列表兜底。
+  let library = null;
+  const named = await post('wiki', 'search_knowledge_base', { query: targetLibrary, cursor: '', limit: 20 }, clientId, apiKey);
+  const namedList = (named && named.info_list) || [];
+  library = namedList.find((item) => item.kb_name === targetLibrary);
+  if (!library) {
+    const libraries = await post('wiki', 'get_addable_knowledge_base_list', { cursor: '', limit: 50 }, clientId, apiKey);
+    library = (libraries.addable_knowledge_base_list || []).find((item) => item.name === targetLibrary);
+  }
   if (!library) throw new Error('target library is not addable');
+  library.id = library.id || library.kb_id;
 
   stage = 'list-root';
   const rootItems = await listAll(library.id, null, clientId, apiKey);

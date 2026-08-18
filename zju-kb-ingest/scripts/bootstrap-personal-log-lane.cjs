@@ -71,9 +71,17 @@ async function main() {
   const profile = loadProfile();
   const clientId = loadText('client_id');
   const apiKey = loadText('api_key');
-  const libraries = await post('wiki', 'get_addable_knowledge_base_list', { cursor: '', limit: 50 }, clientId, apiKey);
-  const library = (libraries.addable_knowledge_base_list || []).find((item) => item.name === targetLibrary);
+  // 库定位：优先 search_knowledge_base（info_list，共享/管理员角色可见）；addable 列表兜底。
+  let library = null;
+  const named = await post('wiki', 'search_knowledge_base', { query: targetLibrary, cursor: '', limit: 20 }, clientId, apiKey);
+  const namedList = (named && named.info_list) || [];
+  library = namedList.find((item) => item.kb_name === targetLibrary);
+  if (!library) {
+    const libraries = await post('wiki', 'get_addable_knowledge_base_list', { cursor: '', limit: 50 }, clientId, apiKey);
+    library = (libraries.addable_knowledge_base_list || []).find((item) => item.name === targetLibrary);
+  }
   if (!library) throw new Error('target-library-not-addable');
+  library.id = library.id || library.kb_id;
   const root = await listAll(library.id, library.id, clientId, apiKey).catch(() => []);
   const rootItems = root.length ? root : await (async () => {
     const data = await post('wiki', 'get_knowledge_list', { knowledge_base_id: library.id, cursor: '', limit: 50 }, clientId, apiKey);

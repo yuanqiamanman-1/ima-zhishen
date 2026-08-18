@@ -170,9 +170,17 @@ async function main() {
   const credentials = { clientId: loadSecret('client_id'), apiKey: loadSecret('api_key') };
   if (!credentials.clientId || !credentials.apiKey) fail('ima-credentials-not-configured');
   const profile = loadProfile();
-  const libraries = await post('wiki', 'get_addable_knowledge_base_list', { cursor: '', limit: 50 }, credentials);
-  const library = (libraries.addable_knowledge_base_list || []).find((item) => item && item.name === manifest.library);
+  // 库定位：优先 search_knowledge_base（info_list，共享/管理员角色可见）；addable 列表兜底。
+  let library = null;
+  const named = await post('wiki', 'search_knowledge_base', { query: manifest.library, cursor: '', limit: 20 }, credentials);
+  const namedList = (named && named.info_list) || [];
+  library = namedList.find((item) => item && item.kb_name === manifest.library);
+  if (!library) {
+    const libraries = await post('wiki', 'get_addable_knowledge_base_list', { cursor: '', limit: 50 }, credentials);
+    library = (libraries.addable_knowledge_base_list || []).find((item) => item && item.name === manifest.library);
+  }
   if (!library) fail('target-library-not-addable');
+  library.id = library.id || library.kb_id;
 
   // These calls do not depend on one another. Parallelizing them keeps a
   // one-folder import responsive without parallelizing any write or log append.
