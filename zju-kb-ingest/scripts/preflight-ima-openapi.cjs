@@ -65,19 +65,23 @@ async function main() {
     return;
   }
 
-  // 官方文档：用户已给出库名时用 search_knowledge_base（info_list）按名称定位，
-  // 它对共享/管理员角色可见的库也返回结果；addable 列表仅用于未指定库时的兜底。
+  // search_knowledge_base locates a named shared library. Visibility is not
+  // evidence of add-content permission, so query addable separately whenever
+  // the endpoint is available.
   const named = await hasNamedKnowledgeBase('search_knowledge_base', 'info_list', clientId, apiKey);
-  const addable = named.found ? { apiOk: true, found: true } : await hasNamedKnowledgeBase('get_addable_knowledge_base_list', 'addable_knowledge_base_list', clientId, apiKey);
+  const addable = await hasNamedKnowledgeBase('get_addable_knowledge_base_list', 'addable_knowledge_base_list', clientId, apiKey);
   const apiReachable = named.apiOk || addable.apiOk;
   const found = named.found || addable.found;
+  const writeAccess = addable.found;
+  const writeAccessEvidence = writeAccess ? 'confirmed-by-addable-list' : (found ? 'unverified-shared-library-visibility-only' : 'not-found');
   const result = {
     configured: true,
     apiReachable,
     knowledgeBaseFound: found,
-    writeAccess: found,
+    writeAccess,
+    writeAccessEvidence,
     readyForWrite: apiReachable && found,
-    nextAction: apiReachable && found ? 'resolve-folders-and-import' : 'check-credentials-or-library-permission',
+    nextAction: apiReachable && found ? (writeAccess ? 'resolve-folders-and-import' : 'resolve-folders-and-import-write-unverified') : 'check-credentials-or-library-permission',
   };
   console.log(JSON.stringify(result));
   if (!result.readyForWrite) process.exitCode = 1;
