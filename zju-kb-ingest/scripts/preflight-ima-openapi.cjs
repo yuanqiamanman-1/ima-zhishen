@@ -43,11 +43,13 @@ async function post(operation, body, clientId, apiKey) {
 async function hasNamedKnowledgeBase(operation, field, clientId, apiKey) {
   let cursor = '';
   for (let page = 0; page < 20; page += 1) {
-    const result = await post(operation, { cursor, limit: 50, ...(operation === 'search_knowledge_base' ? { query: targetName } : {}) }, clientId, apiKey);
+    // search_knowledge_base 的 limit 上限为 20；get_addable_knowledge_base_list 可用 50。
+    const limit = operation === 'search_knowledge_base' ? 20 : 50;
+    const result = await post(operation, { cursor, limit, ...(operation === 'search_knowledge_base' ? { query: targetName } : {}) }, clientId, apiKey);
     if (!result.httpOk || result.code !== 0 || !result.payload) return { apiOk: false, found: false };
     const data = result.payload.data || result.payload;
     const items = data[field] || [];
-    if (items.some((item) => item && item.name === targetName)) return { apiOk: true, found: true };
+    if (items.some((item) => item && (item.name === targetName || item.kb_name === targetName))) return { apiOk: true, found: true };
     if (data.is_end || !data.next_cursor || data.next_cursor === cursor) return { apiOk: true, found: false };
     cursor = data.next_cursor;
   }
@@ -63,17 +65,24 @@ async function main() {
     return;
   }
 
+  // search_knowledge_base locates a named shared library. Visibility is not
+  // evidence of add-content permission, so query addable separately whenever
+  // the endpoint is available.
+  const named = await hasNamedKnowledgeBase('search_knowledge_base', 'info_list', clientId, apiKey);
   const addable = await hasNamedKnowledgeBase('get_addable_knowledge_base_list', 'addable_knowledge_base_list', clientId, apiKey);
-  // Shared/subscribed libraries are reliably exposed through the addable-list API.
-  // Do not block a collaborator on search_knowledge_base, which can reject this surface.
-  const apiReachable = addable.apiOk;
+  const apiReachable = named.apiOk || addable.apiOk;
+  const found = named.found || addable.found;
+  const writeAccess = addable.found;
+  const writeAccessEvidence = writeAccess ? 'confirmed-by-addable-list' : (found ? 'unverified-shared-library-visibility-only' : 'not-found');
   const result = {
     configured: true,
     apiReachable,
-    knowledgeBaseFound: addable.found,
-    writeAccess: addable.found,
-    readyForWrite: apiReachable && addable.found,
-    nextAction: apiReachable && addable.found ? 'resolve-folders-and-import' : 'check-credentials-or-library-permission',
+    knowledgeBaseFound: found,
+    writeAccess,
+    writeAccessEvidence,
+    readyForImportAttempt: apiReachable && found,
+    readyForWrite: apiReachable && found && writeAccess,
+    nextAction: apiReachable && found ? (writeAccess ? 'resolve-folders-and-import' : 'resolve-folders-and-import-write-unverified') : 'check-credentials-or-library-permission',
   };
   console.log(JSON.stringify(result));
   if (!result.readyForWrite) process.exitCode = 1;

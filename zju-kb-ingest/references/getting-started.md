@@ -35,7 +35,7 @@ Skill 先运行 `scripts/check-ima-openapi.ps1`（Windows）或 `node scripts/ch
 2. 获取本人 `Client ID` 与 `API Key`。
 3. 在本机运行 `scripts/save-ima-credentials.ps1`，在终端内输入两项值；脚本不回显、不上传、不把值写入 Skill 或日志。
 4. 再运行 `scripts/check-ima-openapi.ps1` 或 `node scripts/check-ima-openapi.cjs`，确认返回 `ready: true`。这一步仅表示本机已配置凭据。
-5. 真正开始写入前，再运行 `node scripts/preflight-ima-openapi.cjs`。只有返回 `readyForWrite: true` 才表示：官方 API 在该账号的可添加知识库列表中看得到 `浙大校园信息站`，且该账号有添加内容权限。
+5. 真正开始写入前，再运行 `node scripts/preflight-ima-openapi.cjs`。`knowledgeBaseFound: true` 表示已定位到共享库；`readyForImportAttempt: true` 表示可以继续做目录解析和受控导入尝试；只有 `writeAccess: true` / `writeAccessEvidence: confirmed-by-addable-list` 且 `readyForWrite: true` 才表示已由可添加列表确认写权限。共享库可能仅能定位而无法预先确认写权限，此时会标为 `unverified-shared-library-visibility-only`，实际导入仍会通过官方写接口验证，并且失败时不会写成功日志。
 
 ## C. API 调用约定
 
