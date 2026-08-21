@@ -80,7 +80,8 @@ async function main() {
     knowledgeBaseFound: found,
     writeAccess,
     writeAccessEvidence,
-    readyForWrite: apiReachable && found,
+    readyForImportAttempt: apiReachable && found,
+    readyForWrite: apiReachable && found && writeAccess,
     nextAction: apiReachable && found ? (writeAccess ? 'resolve-folders-and-import' : 'resolve-folders-and-import-write-unverified') : 'check-credentials-or-library-permission',
   };
   console.log(JSON.stringify(result));
